@@ -1,74 +1,73 @@
-# yolov8/manual_box.py
+# --------------------------------------------
+# For each image:
+#   - Run YOLOv8 inference
+#   - Save image with bounding boxes
+#   - Save center points of boxes for SAM prompt
+# --------------------------------------------
 
-import cv2  # OpenCV for image display and mouse events
-import numpy as np  # For saving prompt points
+from ultralytics import YOLO
+import cv2
+import numpy as np
+import os
 
-# ----------- Load Image -----------
-image_path = "images/test2.jpg"  # Path to the input image
-image = cv2.imread(image_path)  # Load the image
-clone = image.copy()  # Keep a copy to reset if needed
+# ------------------------------
+# Setup: Paths
+# ------------------------------
+input_folder = "train"              # Folder with input images
+output_folder = "output-dataset"            # Folder to save outputs
+os.makedirs(output_folder, exist_ok=True)
 
-# List to store bounding boxes in the format: [x1, y1, x2, y2]
-boxes = []
+# ------------------------------
+# Load Pretrained YOLOv8 Model
+# ------------------------------
+model = YOLO("yolov8n.pt")        
 
-# Drawing state variables
-drawing = False  # True when mouse is dragging
-ix, iy = -1, -1  # Initial x, y when mouse is pressed
+# ------------------------------
+# Process Each Image in Folder
+# ------------------------------
+image_files = [f for f in os.listdir(input_folder)
+               if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
 
-# ----------- Mouse Callback Function -----------
-def draw_rectangle(event, x, y, flags, param):
-    """
-    Mouse callback to draw rectangles (bounding boxes).
-    - Press and hold left mouse button to start drawing.
-    - Release to finish and save the box.
-    """
-    global ix, iy, drawing, image, boxes
+print(f"📁 Found {len(image_files)} image(s) in '{input_folder}'")
 
-    if event == cv2.EVENT_LBUTTONDOWN:
-        drawing = True  # Start drawing
-        ix, iy = x, y  # Record starting point
+for img_file in image_files:
+    # --- Load Image ---
+    image_path = os.path.join(input_folder, img_file)
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"⚠️ Skipping unreadable image: {img_file}")
+        continue
 
-    elif event == cv2.EVENT_LBUTTONUP:
-        drawing = False  # Stop drawing
-        # Draw a green rectangle from start (ix, iy) to end (x, y)
-        cv2.rectangle(image, (ix, iy), (x, y), (0, 255, 0), 2)
-        # Save the box coordinates
-        boxes.append([ix, iy, x, y])
+    print(f"\n🔍 Processing '{img_file}'")
 
-# ----------- Window Setup -----------
-cv2.namedWindow("Image")  # Create a window named "Image"
-cv2.setMouseCallback("Image", draw_rectangle)  # Set callback function
+    # --- Run YOLO Inference ---
+    results = model(image_path)
+    boxes = results[0].boxes.xyxy.cpu().numpy() if results[0].boxes else []
 
-# ----------- Main Loop -----------
-while True:
-    cv2.imshow("Image", image)  # Display the image with drawn boxes
-    key = cv2.waitKey(1) & 0xFF  # Wait for key press (1ms)
+    print(f"   ➤ Detected {len(boxes)} bounding boxes")
 
-    if key == ord("r"):
-        # Reset image and bounding boxes
-        print("Resetting drawing...")
-        image = clone.copy()
-        boxes = []
+    # --- Draw Boxes ---
+    for box in boxes:
+        x1, y1, x2, y2 = map(int, box)
+        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+        cv2.putText(image, "YOLO Box", (x1, y1 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
-    elif key == ord("q"):
-        # Quit the loop and proceed to save
-        break
+    # --- Save Output Image ---
+    base_name = os.path.splitext(img_file)[0]
+    out_image_path = os.path.join(output_folder, f"{base_name}_boxed.jpg")
+    cv2.imwrite(out_image_path, image)
+    print(f"   💾 Saved boxed image: {out_image_path}")
 
-# ----------- Cleanup -----------
-cv2.destroyAllWindows()  # Close the window
+    # --- Extract Center Points ---
+    prompt_points = []
+    for box in boxes:
+        x1, y1, x2, y2 = box
+        cx = int((x1 + x2) / 2)
+        cy = int((y1 + y2) / 2)
+        prompt_points.append([cx, cy])
 
-# ----------- Convert Boxes to Center Points -----------
-# Format: [[cx1, cy1], [cx2, cy2], ...]
-prompt_points = [
-    [int((x1 + x2) / 2), int((y1 + y2) / 2)]
-    for (x1, y1, x2, y2) in boxes
-]
-
-# ----------- Save Prompt Points and Image -----------
-np.save("outputs//test2/bbox_points.npy", np.array(prompt_points))  # For SAM prompt
-cv2.imwrite("outputs/test2/boxed_image.jpg", image)  # Save image with boxes
-
-# ----------- Final Message -----------
-print(f"✅ Saved {len(prompt_points)} prompt points to 'outputs/bbox_points.npy'")
-print(f"✅ Saved boxed image to 'outputs/boxed_image.jpg'")
-print("💡 Use these points in the next step with SAM-HQ2.")
+    # --- Save Center Points to .npy ---
+    out_points_path = os.path.join(output_folder, f"{base_name}_points.npy")
+    np.save(out_points_path, np.array(prompt_points))
+    print(f"   💾 Saved prompt points: {out_points_path}")

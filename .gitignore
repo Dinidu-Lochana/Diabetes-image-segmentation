@@ -1,2 +1,7 @@
 .env
 venv
+sam-hq
+/yolov8/outputs
+/yolov8/output-dataset
+/yolov8/train
+/yolov8/dataset-v3
