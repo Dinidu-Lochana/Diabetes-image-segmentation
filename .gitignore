@@ -5,3 +5,4 @@ sam-hq
 /yolov8/output-dataset
 /yolov8/train
 /yolov8/dataset-v3
+sam_hq_vit_h.pth
