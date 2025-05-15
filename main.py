@@ -1,68 +1,75 @@
-import torch
-import cv2
+# sam_infer.py
+
+import os
 import numpy as np
-from matplotlib import pyplot as plt
-from pathlib import Path
-import sys
+import cv2
+import matplotlib.pyplot as plt
+import torch
 
-# Add `sam_hq` to system path
-sys.path.append(str(Path(__file__).parent / "sam_hq"))
+# 1️⃣ Import SAM-HQ model and predictor from official repo
+from sam_hq.segment_anything.build_sam import build_sam
+from sam_hq.segment_anything.predictor import SamPredictor
 
-# Now import from segment_anything
-from segment_anything import SamPredictor, sam_model_registry
+# 🔁 Import YOLOv8
+from ultralytics import YOLO
 
-# Paths
-YOLO_WEIGHTS = "Yolo_Model/yolov5/runs/train/exp/weights/last.pt"
-SAM_CHECKPOINT = "sam_hq_vit_h.pth"
-IMAGE_PATH = "inputs/test2.jpg"
+# 2️⃣ Load test image
+image_path = "inputs/test3.png"
+image_bgr = cv2.imread(image_path)
+image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
-# Load YOLOv5 model (inference only)
-yolo_model = torch.hub.load('ultralytics/yolov5', 'custom', path=YOLO_WEIGHTS)
-yolo_model.eval()
+# 🟡 Load YOLOv8 model
+yolo_model = YOLO("runs/detect/train4/weights/best.pt")
+results = yolo_model(image_path)[0]  # first result
 
-# Load SAM-HQ model
-sam = sam_model_registry["vit_h"](checkpoint=SAM_CHECKPOINT)
+# 🔁 Convert YOLO bounding boxes to prompt points (center of bbox)
+prompt_points = []
+for box in results.boxes.xyxy.cpu().numpy():
+    x1, y1, x2, y2 = box
+    center_x = int((x1 + x2) / 2)
+    center_y = int((y1 + y2) / 2)
+    prompt_points.append([center_x, center_y])
+
+if not prompt_points:
+    print("⚠️ No objects detected by YOLO. Exiting.")
+    exit()
+
+input_points = np.array(prompt_points)
+input_labels = np.ones(len(input_points))  # foreground
+
+# 4️⃣ Load the SAM-HQ model
+checkpoint_path = "sam_hq_vit_h.pth"
+model_type = "vit_h"  # SAM-HQ supports vit_h, vit_l, vit_b
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+# Build SAM-HQ model using the helper
+sam = build_sam(checkpoint=checkpoint_path)
+sam.to(device)
+
+# 5️⃣ Create predictor and set image
 predictor = SamPredictor(sam)
+predictor.set_image(image_rgb)
 
-# --- Function: Use YOLOv5 to get wound bounding boxes ---
-def detect_with_yolo(image):
-    results = yolo_model(image)
-    bboxes = results.xyxy[0].cpu().numpy()  # shape: (num_boxes, 6) → [x1, y1, x2, y2, conf, class]
-    return bboxes[:, :4]  # only return [x1, y1, x2, y2]
+# 6️⃣ Predict masks using the prompt points
+masks, scores, logits = predictor.predict(
+    point_coords=input_points,
+    point_labels=input_labels,
+    multimask_output=False
+)
 
-# --- Function: Use SAM-HQ2 to segment based on YOLO box ---
-def segment_with_sam(image, box):
-    predictor.set_image(image)
-    input_box = np.array(box, dtype=np.float32)
-    masks, _, _ = predictor.predict(box=input_box[None, :], multimask_output=False)
-    return masks[0]
+# 7️⃣ Plot results
+plt.figure(figsize=(10, 10))
+plt.imshow(image_rgb)
 
-# --- Visualization ---
-def visualize(image, mask, box, save_path):
-    masked = image.copy()
-    masked[~mask] = 0
+for mask in masks:
+    plt.imshow(mask, alpha=0.5)  # overlay mask
 
-    # Draw bounding box
-    x1, y1, x2, y2 = map(int, box)
-    cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2)
+for pt in prompt_points:
+    plt.plot(pt[0], pt[1], 'ro')  # red prompt point
 
-    # Save the result
-    result = np.hstack([image, masked])
-    cv2.imwrite(save_path, cv2.cvtColor(result, cv2.COLOR_RGB2BGR))
-    print(f"Saved result to: {save_path}")
-
-# --- Main Pipeline ---
-def process_image(image_path):
-    image = cv2.imread(image_path)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    boxes = detect_with_yolo(image_rgb)
-    print(f"Detected {len(boxes)} wounds")
-
-    for idx, box in enumerate(boxes):
-        mask = segment_with_sam(image_rgb, box)
-        save_path = f"outputs/model_segmented_{idx+1}.png"
-        visualize(image_rgb.copy(), mask, box, save_path)
-
-if __name__ == "__main__":
-    process_image(IMAGE_PATH)
+plt.axis('off')
+output_path = "outputs/segmented_result3.png"
+plt.savefig(output_path)
+print(f"✅ Segmentation saved to: {output_path}")
+plt.show()
