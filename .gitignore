@@ -1,2 +1,12 @@
 .env
 venv
+sam_hq
+/yolov8/outputs
+/yolov8/output-dataset
+/yolov8/train
+/yolov8/dataset-v3
+sam_hq_vit_h.pth
+outputs
+inputs
+dataset
+wound_dataset
