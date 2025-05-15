@@ -8,3 +8,5 @@ sam_hq
 sam_hq_vit_h.pth
 outputs
 inputs
+dataset
+wound_dataset
