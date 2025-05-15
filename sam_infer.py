@@ -11,7 +11,7 @@ from sam_hq.segment_anything.build_sam import build_sam
 from sam_hq.segment_anything.predictor import SamPredictor
 
 # 2️⃣ Load test image
-image_path = "images/test.jpg"
+image_path = "yolov8/images/test2.jpg"
 image_bgr = cv2.imread(image_path)
 image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
@@ -22,7 +22,7 @@ input_points = np.array(prompt_points)
 input_labels = np.ones(len(input_points))  # All points labeled as "foreground"
 
 # 4️⃣ Load the SAM-HQ model
-checkpoint_path = "sam-hq/sam_hq_vit_h.pth"
+checkpoint_path = "sam_hq_vit_h.pth"
 model_type = "vit_h"  # SAM-HQ supports vit_h, vit_l, vit_b
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -54,7 +54,7 @@ for pt in prompt_points:
     plt.plot(pt[0], pt[1], 'ro')  # red point
 
 plt.axis('off')
-output_path = "outputs/segmented_result.png"
+output_path = "outputs/segmented_result2.png"
 plt.savefig(output_path)
 print(f"Segmentation saved to: {output_path}")
 plt.show()
