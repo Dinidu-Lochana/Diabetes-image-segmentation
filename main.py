@@ -34,21 +34,13 @@ image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 yolo_model = YOLO("runs/detect/train4/weights/best.pt")
 results = yolo_model(image_path)[0]  # Get first result
 
-# Extract original and expanded boxes
+# Extract original boxes and prompt points
 original_boxes = []
-# expanded_boxes = []
 prompt_points = []
 
 for box in results.boxes.xyxy.cpu().numpy():
     x1, y1, x2, y2 = box
     original_boxes.append([x1, y1, x2, y2])
-
-    # # Expand the box slightly
-    # x1_new = x1 - 0 * (x2 - x1)
-    # x2_new = x2 + 0 * (x2 - x1)
-    # y1_new = y1 - 0 * (y2 - y1)
-    # y2_new = y2 + 0 * (y2 - y1)
-    # expanded_boxes.append([x1, y1 , x2 , y2 ])
 
     # Get center point
     center_x = int((x1 + x2) / 2)
@@ -86,12 +78,26 @@ for i in range(len(original_boxes)):
         multimask_output=False
     )
 
-    # Plot mask
+    x1, y1, x2, y2 = map(int, original_boxes[i])
     for mask in masks:
-        plt.imshow(mask, alpha=0.5)
+        # Clip mask to bounding box
+        clipped_mask = np.zeros_like(mask, dtype=bool)
+        clipped_mask[y1:y2, x1:x2] = mask[y1:y2, x1:x2]
 
-    # Plot original YOLO box
-    x1, y1, x2, y2 = original_boxes[i]
+        # Create RGBA overlay with yellow color and transparency
+        yellow_mask = np.zeros((*clipped_mask.shape, 4), dtype=np.float32)
+        yellow_mask[..., 0] = 1.0  # Red channel
+        yellow_mask[..., 1] = 1.0  # Green channel
+        yellow_mask[..., 2] = 0.0  # Blue channel
+        yellow_mask[..., 3] = clipped_mask * 0.5  # Alpha channel
+
+        # Mask outside pixels transparent
+        masked_display = np.ma.masked_where(~clipped_mask, yellow_mask[..., 3])
+
+        # Plot yellow mask overlay
+        plt.imshow(yellow_mask)
+
+    # Draw bounding box
     plt.gca().add_patch(plt.Rectangle(
         (x1, y1),
         x2 - x1,
@@ -103,8 +109,8 @@ for i in range(len(original_boxes)):
 
 # -------------------------- Save & Show --------------------------
 plt.axis('off')
-os.makedirs("outputs_SAM_HQ2_NO", exist_ok=True)
-output_path = "outputs_SAM_HQ2_NO/segmented2_with_boxes.png"
+os.makedirs("outputs_SAM_HQ2_cropped_image", exist_ok=True)
+output_path = "outputs_SAM_HQ2_cropped_image/segmented2_with_boxes.png"
 plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
 print(f"✅ Segmented result saved to: {output_path}")
 plt.show()
