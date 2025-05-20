@@ -24,14 +24,14 @@ from sam2.sam2_image_predictor import SAM2ImagePredictor
 from ultralytics import YOLO
 
 # -------------------------- Load Image --------------------------
-image_path = "inputs/test1.jpg"
+image_path = "inputs/test2.jpg"
 image_bgr = cv2.imread(image_path)
 if image_bgr is None:
     raise FileNotFoundError(f"❌ Image not found at: {image_path}")
 image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
 # -------------------------- Run YOLOv8 --------------------------
-yolo_model = YOLO("runs/detect/train4/weights/best.pt")
+yolo_model = YOLO("runs/detect/train9/weights/best.pt")
 results = yolo_model(image_path)[0]  # Get first result
 
 # Extract original boxes and prompt points
@@ -110,7 +110,7 @@ for i in range(len(original_boxes)):
 # -------------------------- Save & Show --------------------------
 plt.axis('off')
 os.makedirs("outputs_SAM_HQ2_cropped_image", exist_ok=True)
-output_path = "outputs_SAM_HQ2_cropped_image/segmented2_with_boxes.png"
+output_path = "outputs_SAM_HQ2_cropped_image/segmented150_with_boxes.png"
 plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
 print(f"✅ Segmented result saved to: {output_path}")
 plt.show()
