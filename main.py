@@ -31,7 +31,7 @@ if image_bgr is None:
 image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
 # -------------------------- Run YOLOv8 --------------------------
-yolo_model = YOLO("runs/detect/train16/weights/best.pt")
+yolo_model = YOLO("runs/detect/train17/weights/best.pt")
 results = yolo_model(image_path)[0]  # Get first result
 
 # Extract original boxes and prompt points
