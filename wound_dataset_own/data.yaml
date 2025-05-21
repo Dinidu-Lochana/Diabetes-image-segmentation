@@ -1,0 +1,5 @@
+train: C:/24/Kainovation Technologies/Diabetes-image-segmentation/wound_dataset/images/train
+val: C:/24/Kainovation Technologies/Diabetes-image-segmentation/wound_dataset/images/valid
+
+nc: 1
+names: ['wound']
