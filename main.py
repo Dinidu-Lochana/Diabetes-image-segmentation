@@ -31,7 +31,7 @@ if image_bgr is None:
 image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
 
 # -------------------------- Run YOLOv8 --------------------------
-yolo_model = YOLO("runs/detect/train14/weights/best.pt")
+yolo_model = YOLO("runs/detect/train15/weights/best.pt")
 results = yolo_model(image_path)[0]  # Get first result
 
 # Extract original boxes and prompt points
@@ -110,7 +110,20 @@ for i in range(len(original_boxes)):
 # -------------------------- Save & Show --------------------------
 plt.axis('off')
 os.makedirs("outputs_SAM_HQ2_cropped_image", exist_ok=True)
-output_path = "outputs_SAM_HQ2_cropped_image/segmented13_with_boxes.png"
+
+# Auto-increment output filename
+output_dir = "outputs_SAM_HQ2_cropped_image"
+os.makedirs(output_dir, exist_ok=True)
+
+# Find next available file name
+i = 1
+while True:
+    output_path = os.path.join(output_dir, f"segmented{i}_with_boxes.png")
+    if not os.path.exists(output_path):
+        break
+    i += 1
+
 plt.savefig(output_path, bbox_inches='tight', pad_inches=0)
 print(f"✅ Segmented result saved to: {output_path}")
+
 plt.show()
